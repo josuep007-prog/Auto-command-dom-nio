@@ -31,6 +31,7 @@ src/
 scripts/
   build.mjs             volta a embutir vendor/ e escreve dist/
   verificar-vendor.mjs  confere o SHA-256 das bibliotecas contra o npm
+  verificar-previa.mjs  prova que a prévia hospedada é o mesmo programa
 tests/
   smoke.spec.mjs    a página abre, os módulos navegam, o modelo sai válido
   regras.spec.mjs   feriado móvel, dia útil, prazo do S-1200, CPF/CNPJ, centavos
@@ -81,6 +82,23 @@ mora agora. Para publicar a v28, é ali que se muda.
 
 `dist/` não é versionado: são 2,6 MB que o build reproduz a qualquer momento a
 partir de `src/`.
+
+O build também escreve `dist/artifact.html`, que é o mesmo programa preparado
+para ser hospedado como página — serve para abrir a prévia num navegador de
+verdade sem instalar nada. Duas diferenças em relação ao arquivo entregue, as
+duas só na prévia:
+
+- vai sem as tags externas (`<html>`, `<head>`, `<body>`), porque a hospedagem
+  monta o próprio esqueleto em volta;
+- os ~51 mil `U+FFFD` das tabelas de code page do SheetJS viram o escape
+  `�`. São caracteres legítimos da biblioteca — marcam as posições daquele
+  code page sem correspondência em Unicode —, mas hospedagem os lê como arquivo
+  mal decodificado e recusa o envio. Em JavaScript o escape produz exatamente o
+  mesmo caractere.
+
+`npm run test` roda `verificar-previa.mjs` antes dos testes: ele carrega os dois
+arquivos, remonta as tabelas de code page em memória e compara. Se o escape
+algum dia cair fora de uma string, a divergência aparece ali.
 
 ## Testes
 

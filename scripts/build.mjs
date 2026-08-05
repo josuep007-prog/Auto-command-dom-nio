@@ -51,9 +51,38 @@ async function build() {
   await mkdir(dirname(destino), { recursive: true });
   await writeFile(destino, saida, "utf8");
 
+  const artefato = p("dist", "artifact.html");
+  const previa = paraArtifact(saida);
+  await writeFile(artefato, previa, "utf8");
+
   const kb = (n) => (n / 1024).toFixed(0).padStart(6) + " KB";
   for (const { nome, bytes } of embutidos) console.log(`  embutido ${kb(bytes)}  ${nome}`);
   console.log(`  gerado   ${kb(saida.length)}  ${destino.slice(raiz.length + 1)}`);
+  console.log(`  gerado   ${kb(previa.length)}  ${artefato.slice(raiz.length + 1)} (previa hospedada)`);
+}
+
+/* O SheetJS traz ~51 mil U+FFFD literais dentro das tabelas de code page: sao as
+ * posicoes daquele code page que nao tem correspondencia em Unicode, e a propria
+ * biblioteca as marca assim. Hospedagem costuma ler U+FFFD como sinal de arquivo
+ * mal decodificado e recusar o envio, entao na previa o caractere vira o escape
+ * \\ufffd — em JavaScript os dois produzem exatamente o mesmo caractere, dentro de
+ * string ou de regex. O arquivo entregue ao escritorio nao passa por aqui: ele
+ * continua byte a byte igual a biblioteca publicada no npm. */
+const escaparFFFD = (s) => s.replaceAll("�", "\\ufffd");
+
+/* A previa publicada entra dentro de um esqueleto HTML pronto, entao o conteudo
+ * vai sem as tags externas — <title> e <style> ficam, porque o publicador os
+ * remonta no <head> dele. O charset tambem e dele; o viewport sai junto.
+ * A classe do <body> nao se perde: trocarModulo() a reescreve na partida. */
+function paraArtifact(html) {
+  return escaparFFFD(html)
+    .replace(/^<!DOCTYPE html>\s*\r?\n/i, "")
+    .replace(/^<html[^>]*>\s*\r?\n/im, "")
+    .replace(/^<head>\s*\r?\n/im, "")
+    .replace(/^[ \t]*<meta[^>]*>[ \t]*\r?\n/gim, "")
+    .replace(/^<\/head>\s*\r?\n/im, "")
+    .replace(/^<body[^>]*>\s*\r?\n/im, "")
+    .replace(/\s*<\/body>\s*<\/html>\s*$/i, "\n");
 }
 
 build().catch((e) => {
