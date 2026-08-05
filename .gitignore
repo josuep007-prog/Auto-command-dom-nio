@@ -1,0 +1,11 @@
+node_modules/
+
+# gerado pelo build a partir de src/ — nao versionar 2,6 MB a cada commit
+dist/
+
+# saida dos testes
+test-results/
+playwright-report/
+
+# screenshots de conferencia, nao fazem parte do programa
+.shots/
