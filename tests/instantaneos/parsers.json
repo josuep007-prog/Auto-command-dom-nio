@@ -1,0 +1,295 @@
+{
+ "contracheque": {
+  "empresa": "ACME SERVICOS LTDA",
+  "cnpj": "12.345.678/0001-95",
+  "competencia": "03/2026",
+  "empregados": [
+   {
+    "codigo": "12",
+    "codigoOriginal": "12",
+    "nome": "MARIA DA SILVA",
+    "funcao": "ANALISTA",
+    "marcado": true
+   },
+   {
+    "codigo": "13",
+    "codigoOriginal": "13",
+    "nome": "JOAO PEREIRA",
+    "funcao": "AUXILIAR",
+    "marcado": true
+   }
+  ],
+  "rubricas": [
+   {
+    "codigo": 1050,
+    "descricao": "VALE TRANSPORTE",
+    "tipo": "variavel",
+    "qtdEmpregados": 2,
+    "ocorrencias": 2,
+    "porEmpregado": {
+     "12": 180,
+     "13": 120
+    },
+    "variaValor": true,
+    "emTodos": true,
+    "marcada": true
+   },
+   {
+    "codigo": 1080,
+    "descricao": "PREMIO",
+    "tipo": "variavel",
+    "qtdEmpregados": 1,
+    "ocorrencias": 1,
+    "porEmpregado": {
+     "12": 500
+    },
+    "variaValor": false,
+    "emTodos": false,
+    "marcada": true
+   }
+  ],
+  "rubricasDescartadas": [
+   {
+    "codigo": 9001,
+    "descricao": "INSS",
+    "tipo": "automatica",
+    "qtdEmpregados": 1,
+    "ocorrencias": 1,
+    "porEmpregado": {
+     "12": 385
+    },
+    "variaValor": false,
+    "emTodos": false,
+    "marcada": false
+   }
+  ],
+  "avisos": [],
+  "paginas": 1
+ },
+ "liquidos": {
+  "empresa": "ACME SERVICOS LTDA",
+  "cnpj": "12.345.678/0001-95",
+  "competencia": "03/2026",
+  "calculo": "Mensal",
+  "emissao": "05/04/2026",
+  "totalEmpresa": 6700,
+  "grupos": {
+   "contribuintes": [
+    {
+     "codigo": "90",
+     "nome": "CARLOS AUTONOMO",
+     "valor": 1200,
+     "cpf": "",
+     "cpfValido": null,
+     "descricao": "",
+     "numeroRecibo": "",
+     "marcado": true
+    }
+   ],
+   "empregados": [
+    {
+     "codigo": "12",
+     "nome": "MARIA DA SILVA",
+     "valor": 3500,
+     "cpf": "",
+     "cpfValido": null,
+     "descricao": "",
+     "numeroRecibo": "",
+     "marcado": true
+    },
+    {
+     "codigo": "13",
+     "nome": "JOAO PEREIRA",
+     "valor": 2000,
+     "cpf": "",
+     "cpfValido": null,
+     "descricao": "",
+     "numeroRecibo": "",
+     "marcado": true
+    }
+   ],
+   "estagiarios": [],
+   "outros": []
+  },
+  "avisos": [],
+  "paginas": 1
+ },
+ "rpa": {
+  "empresa": "ACME SERVICOS LTDA",
+  "cnpj": "12.345.678/0001-95",
+  "competencia": "04/2026",
+  "dataPagamento": "10/04/2026",
+  "autonomos": [
+   {
+    "nome": "CARLOS AUTONOMO",
+    "cpf": "529.982.247-25",
+    "codigo": "",
+    "cpfValido": true,
+    "valor": 1200,
+    "numeroRecibo": "1234",
+    "data": "10/04/2026",
+    "descricao": "CONSULTORIA",
+    "marcado": true
+   }
+  ],
+  "avisos": [
+   "O código do contribuinte não vem no recibo — preencha na lista abaixo, antes de gerar."
+  ],
+  "paginas": 1
+ },
+ "tipoDocumento": [
+  "lancamentos",
+  "liquidos",
+  "rpa"
+ ],
+ "comparacao": {
+  "antes": {
+   "competencia": "03/2026",
+   "empresa": "ACME SERVICOS LTDA",
+   "pessoas": 3,
+   "total": 6700
+  },
+  "depois": {
+   "competencia": "04/2026",
+   "empresa": "ACME SERVICOS LTDA",
+   "pessoas": 3,
+   "total": 7100
+  },
+  "entraram": [],
+  "sairam": [],
+  "mudaram": [
+   {
+    "codigo": "12",
+    "nome": "MARIA DA SILVA",
+    "grupo": "empregados",
+    "antes": 3500,
+    "depois": 3900,
+    "dif": 400,
+    "pct": 11.428571428571429,
+    "alerta": false
+   }
+  ],
+  "iguais": [
+   {
+    "codigo": "90",
+    "nome": "CARLOS AUTONOMO",
+    "grupo": "contribuintes",
+    "antes": 1200,
+    "depois": 1200,
+    "dif": 0,
+    "pct": 0,
+    "alerta": false
+   },
+   {
+    "codigo": "13",
+    "nome": "JOAO PEREIRA",
+    "grupo": "empregados",
+    "antes": 2000,
+    "depois": 2000,
+    "dif": 0,
+    "pct": 0,
+    "alerta": false
+   }
+  ],
+  "somaEntraram": 0,
+  "somaSairam": 0,
+  "difTotal": 400,
+  "avisos": []
+ },
+ "lancamentos": {
+  "dp": {
+   "empresa": 77,
+   "empresaNome": "ACME SERVICOS LTDA",
+   "competencia": "03/2026",
+   "tipoProcesso": 11,
+   "planoSaude": null,
+   "totalEsperado": 800
+  },
+  "itens": [
+   {
+    "nome": "MARIA DA SILVA",
+    "codigo": 12,
+    "valor": 180,
+    "valorBruto": 180,
+    "rubrica": {
+     "exibicao": "Vale transporte",
+     "codigo": 1050
+    },
+    "linhaPlanilha": 2
+   },
+   {
+    "nome": "MARIA DA SILVA",
+    "codigo": 12,
+    "valor": 500,
+    "valorBruto": 500,
+    "rubrica": {
+     "exibicao": "Premio",
+     "codigo": 1080
+    },
+    "linhaPlanilha": 2
+   },
+   {
+    "nome": "JOAO PEREIRA",
+    "codigo": 13,
+    "valor": 120,
+    "valorBruto": 120,
+    "rubrica": {
+     "exibicao": "Vale transporte",
+     "codigo": 1050
+    },
+    "linhaPlanilha": 3
+   }
+  ],
+  "avisos": [],
+  "linhas": [
+   "100000000012202603000001050110000180000000000077",
+   "100000000012202603000001080110000500000000000077",
+   "100000000013202603000001050110000120000000000077"
+  ],
+  "comErro": []
+ },
+ "modelo": {
+  "nome": "Modelo_Lancamentos_ACME.xlsx",
+  "cor": "0E6B7D",
+  "abas": [
+   "Parametros",
+   "Empregados",
+   "PlanoSaude",
+   "Pensao",
+   "Servicos",
+   "Instrucoes"
+  ]
+ },
+ "conferencias": {
+  "valores": [
+   {
+    "titulo": "Valor zerado — o registro é gerado com R$ 0,00; apague a linha se não for lançar",
+    "lista": [
+     "X — linha 2 da planilha"
+    ]
+   },
+   {
+    "titulo": "Valor negativo — o leiaute não tem campo de sinal e essas linhas não serão geradas",
+    "lista": [
+     "Y — R$ -5,00 (linha 3)"
+    ]
+   },
+   {
+    "titulo": "Mais de duas casas decimais — arredondado para centavos",
+    "lista": [
+     "Z — 1.005 vira R$ 1,00"
+    ]
+   }
+  ],
+  "data": [
+   {
+    "titulo": "Data de pagamento fora da competência",
+    "lista": [
+     "Competência março/2026, pagamento em 10/07/2026 — confira se é isso mesmo."
+    ]
+   }
+  ]
+ },
+ "zip": "80,75,3,4,20,0,0,8,0,0,130,24,34,92,107,188,210,151,2,0,0,0,2,0,0,0,5,0,0,0,97,46,116,120,116,111,105,80,75,1,2,20,0,20,0,0,8,0,0,130,24,34,92,107,188,210,151,2,0,0,0,2,0,0,0,5,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,97,46,116,120,116,80,75,5,6,0,0,0,0,1,0,1,0,51,0,0,0,37,0,0,0,0,0",
+ "csv": "a;b\r\n1;\"x;y\"\r\n2;\"as\"\"pas\"\r\n"
+}

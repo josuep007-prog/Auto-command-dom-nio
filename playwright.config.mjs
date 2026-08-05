@@ -6,6 +6,14 @@ import { defineConfig } from "@playwright/test";
 export default defineConfig({
   testDir: "./tests",
   fullyParallel: true,
+  /* servido.spec.mjs carrega src/ por HTTP, com os modulos ES separados — o
+     mesmo caminho que o servidor entregara. Os demais testes usam file://. */
+  webServer: {
+    command: "npx http-server src -p 4173 -c-1 --silent",
+    url: "http://127.0.0.1:4173/",
+    reuseExistingServer: true,
+    timeout: 30_000,
+  },
   forbidOnly: !!process.env.CI,
   retries: 0,
   reporter: process.env.CI ? [["list"], ["html", { open: "never" }]] : "list",

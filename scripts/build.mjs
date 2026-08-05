@@ -1,13 +1,17 @@
 /* Remonta o arquivo unico que o escritorio usa.
  *
- * Em desenvolvimento o app vive em src/index.html e carrega as bibliotecas
- * de vendor/ como arquivos separados — assim cada edicao mexe em 280 KB e nao
- * em 2,6 MB. O build volta a embuti-las, porque o programa roda offline, de
- * dentro de uma pasta de rede, e precisa continuar sendo um arquivo so.
+ * Em desenvolvimento o app vive em src/: index.html carrega app.mjs como modulo
+ * e as bibliotecas de vendor/ como arquivos separados — assim cada edicao mexe
+ * em pouca coisa, e nao nos 2,6 MB do arquivo final.
+ *
+ * O build desfaz as duas separacoes: junta o grafo de modulos num script
+ * classico (modulo ES nao carrega de file://, e o programa precisa abrir com
+ * dois cliques de uma pasta de rede) e volta a embutir as bibliotecas.
  */
 import { readFile, writeFile, mkdir } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { build as esbuild } from "esbuild";
 
 const raiz = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const p = (...partes) => resolve(raiz, ...partes);
@@ -18,6 +22,25 @@ const TAG_VENDOR = /^[ \t]*<script src="vendor\/([^"]+)"[^>]*><\/script>[ \t]*\r
 /* o comentario que explica o carregamento em desenvolvimento nao faz sentido
    no arquivo entregue, onde nao ha mais o que carregar */
 const NOTA_DEV = /^[ \t]*<!-- Bibliotecas de terceiros\.[\s\S]*?-->[ \t]*\r?\n/m;
+
+/* <script type="module" src="app.mjs"></script> */
+const TAG_APP = /^[ \t]*<script type="module" src="app\.mjs"><\/script>[ \t]*\r?\n/m;
+
+/* Junta app.mjs e todo o nucleo num script classico. Sem minificar: o arquivo
+   entregue continua legivel, que e como este projeto sempre tratou o proprio
+   codigo — o peso vem das bibliotecas, nao dele. */
+async function empacotarApp() {
+  const r = await esbuild({
+    entryPoints: [p("src/app.mjs")],
+    bundle: true,
+    format: "iife",
+    target: "es2020",
+    charset: "utf8",
+    write: false,
+    logLevel: "silent",
+  });
+  return r.outputFiles[0].text;
+}
 
 async function build() {
   const { version } = JSON.parse(await readFile(p("package.json"), "utf8"));
@@ -42,9 +65,21 @@ async function build() {
     throw new Error("nenhuma tag <script src=\"vendor/...\"> encontrada em src/index.html");
   }
 
-  const saida = partes.join("").replace(NOTA_DEV, "");
-  if (/<script src="vendor\//.test(saida)) {
-    throw new Error("sobrou referencia a vendor/ no arquivo gerado");
+  const comVendor = partes.join("").replace(NOTA_DEV, "");
+
+  const app = await empacotarApp();
+  if (!TAG_APP.test(comVendor)) {
+    throw new Error('nao encontrei <script type="module" src="app.mjs"> em src/index.html');
+  }
+  /* de novo sem replace() com string: o app tem $ em regex e template literal */
+  const corte = comVendor.match(TAG_APP);
+  const saida =
+    comVendor.slice(0, corte.index) +
+    "<script>\n" + app.trimEnd() + "\n</script>\n" +
+    comVendor.slice(corte.index + corte[0].length);
+
+  if (/<script[^>]*src="(vendor\/|app\.mjs)/.test(saida)) {
+    throw new Error("sobrou referencia a arquivo externo no arquivo gerado");
   }
 
   const destino = p("dist", `gerador_importacao_v${version.split(".")[0]}.html`);
@@ -56,6 +91,7 @@ async function build() {
   await writeFile(artefato, previa, "utf8");
 
   const kb = (n) => (n / 1024).toFixed(0).padStart(6) + " KB";
+  console.log(`  empacotado ${kb(app.length)}  app.mjs + nucleo/`);
   for (const { nome, bytes } of embutidos) console.log(`  embutido ${kb(bytes)}  ${nome}`);
   console.log(`  gerado   ${kb(saida.length)}  ${destino.slice(raiz.length + 1)}`);
   console.log(`  gerado   ${kb(previa.length)}  ${artefato.slice(raiz.length + 1)} (previa hospedada)`);

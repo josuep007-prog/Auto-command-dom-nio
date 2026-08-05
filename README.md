@@ -23,25 +23,48 @@ Os registros complementares do leiaute do Domínio cobertos são o **10**
 
 ```
 src/
-  index.html        o programa: HTML, CSS e as ~4.400 linhas de regra de negócio
+  index.html        só a tela: HTML e CSS (1.211 linhas)
+  app.mjs           camada de tela: render, modais, ligação de eventos
+  nucleo/           a regra de negócio, sem DOM — roda igual no navegador e no servidor
+    texto.mjs           normalização de nome, CNPJ/CPF formatado, moeda
+    numeros.mjs         campos de largura fixa, centavos, data, competência
+    documentos.mjs      dígito verificador de CPF e CNPJ
+    calendario.mjs      feriados, dia útil, prazo do S-1200
+    leitura.mjs         PDF e texto colado viram linhas com células
+    contracheque.mjs    empregados e rubricas do recibo de pagamento
+    liquidos.mjs        Relação Geral dos Líquidos
+    rpa.mjs             recibos de pagamento a autônomo
+    comparacao.mjs      conferência mês a mês
+    planilha.mjs        leitura das abas do de-para
+    conferencias.mjs    valores fora do padrão, Latin-1, planilha antiga
+    leiaute.mjs         os registros 10/20/25/30/40 e o Sefip 13 do RPA
+    modelo.mjs          escrita do .xlsx modelo
+    arquivo.mjs         bytes Latin-1, ZIP, CSV, nome do arquivo de saída
   vendor/           bibliotecas de terceiros, sem alteração
     xlsx.full.min.js      SheetJS 0.18.5    — lê as planilhas de-para
     pdf.min.js            pdf.js 3.11.174   — lê os PDFs do Domínio
     pdf.worker.min.js     pdf.js 3.11.174   — worker, carregado na thread principal
 scripts/
-  build.mjs             volta a embutir vendor/ e escreve dist/
+  build.mjs             empacota app.mjs + nucleo/, embute vendor/, escreve dist/
   verificar-vendor.mjs  confere o SHA-256 das bibliotecas contra o npm
   verificar-previa.mjs  prova que a prévia hospedada é o mesmo programa
 tests/
   smoke.spec.mjs    a página abre, os módulos navegam, o modelo sai válido
   regras.spec.mjs   feriado móvel, dia útil, prazo do S-1200, CPF/CNPJ, centavos
+  parsers.spec.mjs  instantâneo dos parsers e do leiaute
+  servido.spec.mjs  a versão em módulos, carregada por HTTP
+  documentos.mjs    contracheque, Relação de Líquidos e RPA sintéticos
 ```
 
-O motivo do split: o arquivo entregue tem 2,6 MB, dos quais 2,3 MB são as duas
-bibliotecas minificadas. Editar o programa nesse formato é lento e qualquer
-diff fica ilegível. Em desenvolvimento o `src/index.html` tem 280 KB e carrega
-as bibliotecas como arquivo; o build faz o caminho de volta. O resultado é
-idêntico ao original — mesmo tamanho em bytes.
+**Por que o núcleo é separado.** Ele não toca no DOM, então o mesmo código roda
+no navegador e no servidor — é o que garante que os dois leiam um relatório do
+mesmo jeito. Enquanto a camada de tela não for modularizada, `app.mjs` publica o
+núcleo em `globalThis`: isso é uma ponte transitória, comentada no próprio
+arquivo, que permitiu extrair a regra sem reescrever a tela junto.
+
+**Por que o build empacota.** Módulo ES não carrega de `file://`, e o programa
+precisa abrir com dois cliques de uma pasta de rede. O `esbuild` junta o grafo
+num script clássico; as bibliotecas voltam a ser embutidas na sequência.
 
 **A ordem das tags de `vendor/` importa.** O `pdf.js` só dispensa o worker
 externo porque o global `pdfjsWorker` já está definido quando ele sobe. Inverter
@@ -68,8 +91,9 @@ npm install          # só na primeira vez
 npm run dev          # abre em http://localhost:4173
 ```
 
-Também dá para abrir `src/index.html` direto no navegador — o programa não
-depende de servidor. Editou, salvou, recarregou.
+Precisa ser por servidor, mesmo que local: `src/index.html` carrega `app.mjs`
+como módulo ES, e módulo não carrega de `file://`. Para abrir com dois cliques,
+use o arquivo gerado por `npm run build`.
 
 ## Gerando o arquivo de entrega
 
@@ -107,11 +131,28 @@ npm test             # faz o build e roda tudo no Chromium
 npm run test:ui      # modo interativo, para ver o teste rodando
 ```
 
-Os testes carregam o arquivo **já montado**, por `file://` — o mesmo contexto
-de segurança em que o escritório usa o programa. O que passa no teste vale para
-o uso real.
+A maioria carrega o arquivo **já montado**, por `file://` — o mesmo contexto de
+segurança em que o escritório usa o programa. `servido.spec.mjs` é a exceção:
+carrega `src/` por HTTP, com os módulos separados, porque os dois caminhos podem
+divergir em silêncio (um import errado quebra servido e passa empacotado, já que
+o bundler resolve na hora do build).
 
-`regras.spec.mjs` roda as funções puras dentro da própria página, em vez de
-reimplementá-las em Node. É de propósito: as datas de feriado e o prazo do
-S-1200 são exatamente o tipo de conta que ninguém confere na tela, e testar uma
-cópia da regra não provaria nada sobre a regra que vai ser entregue.
+As funções são exercitadas **dentro da própria página**, não reimplementadas em
+Node. É de propósito: as datas de feriado e o prazo do S-1200 são o tipo de
+conta que ninguém confere na tela, e testar uma cópia da regra não provaria nada
+sobre a regra que vai ser entregue.
+
+`parsers.spec.mjs` guarda um instantâneo da leitura de um contracheque, de uma
+Relação de Líquidos e de um recibo de RPA sintéticos (`tests/documentos.mjs`),
+mais a geração dos registros de largura fixa. Ele nasceu para provar que a
+extração do núcleo não mudou comportamento — a saída foi comparada com a versão
+anterior à extração e bateu em todas as doze comparações. Para mudar um parser
+de propósito, regrave e confira o diff do JSON:
+
+```bash
+ATUALIZAR_INSTANTANEOS=1 npx playwright test parsers
+```
+
+Os documentos são texto, não PDF: `linhasDoTexto()` produz a mesma estrutura que
+`linhasDoPdf()` extrai de um PDF, o que permite exercitar os parsers sem trazer
+folha de pagamento real para o repositório.
