@@ -29,7 +29,8 @@ src/
     pdf.min.js            pdf.js 3.11.174   — lê os PDFs do Domínio
     pdf.worker.min.js     pdf.js 3.11.174   — worker, carregado na thread principal
 scripts/
-  build.mjs         volta a embutir vendor/ e escreve dist/
+  build.mjs             volta a embutir vendor/ e escreve dist/
+  verificar-vendor.mjs  confere o SHA-256 das bibliotecas contra o npm
 tests/
   smoke.spec.mjs    a página abre, os módulos navegam, o modelo sai válido
   regras.spec.mjs   feriado móvel, dia útil, prazo do S-1200, CPF/CNPJ, centavos
@@ -44,6 +45,20 @@ idêntico ao original — mesmo tamanho em bytes.
 **A ordem das tags de `vendor/` importa.** O `pdf.js` só dispensa o worker
 externo porque o global `pdfjsWorker` já está definido quando ele sobe. Inverter
 as duas linhas quebra a leitura de PDF sem dar nenhum erro visível.
+
+## Conferindo as bibliotecas
+
+```bash
+npm run verify
+```
+
+As três são byte a byte iguais às publicadas no npm — `xlsx@0.18.5` (`dist/`) e
+`pdfjs-dist@3.11.174` (`legacy/build/`, não `build/`: o programa usa a versão
+transpilada). O script guarda o SHA-256 de cada uma e reclama se mudar.
+
+Vale rodar isso porque o programa manipula dado de folha, roda offline e carrega
+as bibliotecas de dentro do próprio HTML — uma linha enxertada ali passaria
+despercebida para sempre.
 
 ## Trabalhando no programa
 
