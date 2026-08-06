@@ -44,6 +44,14 @@ src/
     xlsx.full.min.js      SheetJS 0.18.5    — lê as planilhas de-para
     pdf.min.js            pdf.js 3.11.174   — lê os PDFs do Domínio
     pdf.worker.min.js     pdf.js 3.11.174   — worker, carregado na thread principal
+servidor/            o acervo — em construção, ver o plano
+  FASE-0.md             prova de viabilidade, para rodar na máquina do escritório
+  teste-viabilidade.mjs o servidor mínimo dessa prova
+  banco.mjs             abre o SQLite, aplica migrações
+  migracoes/*.sql       o esquema, aplicado em ordem e controlado por user_version
+  repositorio/          consultas por assunto
+  auditoria.mjs         quem leu e quem alterou o quê
+  testes/               node --test, sem navegador
 scripts/
   build.mjs             empacota app.mjs + nucleo/, embute vendor/, escreve dist/
   verificar-vendor.mjs  confere o SHA-256 das bibliotecas contra o npm
@@ -69,6 +77,37 @@ num script clássico; as bibliotecas voltam a ser embutidas na sequência.
 **A ordem das tags de `vendor/` importa.** O `pdf.js` só dispensa o worker
 externo porque o global `pdfjsWorker` já está definido quando ele sobe. Inverter
 as duas linhas quebra a leitura de PDF sem dar nenhum erro visível.
+
+## O acervo (em construção)
+
+O programa está virando um acervo da folha: empresas, pessoas e os cálculos de
+cada competência, alimentado pelos relatórios que o Domínio já emite. Roda num
+servidor na rede do escritório. O desenho completo está no plano; o que já
+existe aqui é a base do banco.
+
+**Sem nenhuma dependência.** O servidor usa só o que vem no Node: `node:sqlite`
+para o banco, `node:http`, `node:crypto`, `node:test`. Isso não é purismo — é o
+que permite instalar copiando uma pasta, num ambiente onde não se pode instalar
+programas.
+
+```bash
+npm run test:servidor        # node --test, sem navegador
+```
+
+Duas regras atravessam o esquema (`servidor/migracoes/001-inicial.sql`):
+
+- **Dinheiro é inteiro, em centavos.** Ponto flutuante não representa 0,07
+  exatamente, e somar milhares de lançamentos acumula erro — numa folha, isso é
+  diferença em contracheque. Há teste somando 0,07 dez mil vezes.
+- **Fato nunca é editado.** Toda linha aponta para a importação que a trouxe.
+  Reimportar um relatório corrigido cria uma importação nova e marca a anterior
+  como não vigente, que continua consultável. É o rastro de retificação (S-1298)
+  sem nenhum `UPDATE` destrutivo, e um índice parcial garante que só exista uma
+  versão vigente por empresa, competência e tipo de documento.
+
+Antes de qualquer implantação, rode a **Fase 0** (`servidor/FASE-0.md`): ela
+responde, na máquina real, se o Node portátil roda sem administrador e — o que
+decide — se outro computador do escritório alcança a porta.
 
 ## Conferindo as bibliotecas
 
