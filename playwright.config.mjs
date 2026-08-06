@@ -8,12 +8,21 @@ export default defineConfig({
   fullyParallel: true,
   /* servido.spec.mjs carrega src/ por HTTP, com os modulos ES separados — o
      mesmo caminho que o servidor entregara. Os demais testes usam file://. */
-  webServer: {
-    command: "npx http-server src -p 4173 -c-1 --silent",
-    url: "http://127.0.0.1:4173/",
-    reuseExistingServer: true,
-    timeout: 30_000,
-  },
+  webServer: [
+    {
+      command: "npx http-server src -p 4173 -c-1 --silent",
+      url: "http://127.0.0.1:4173/",
+      reuseExistingServer: true,
+      timeout: 30_000,
+    },
+    /* o acervo de verdade, com banco descartavel — acervo.spec.mjs usa este */
+    {
+      command: "node scripts/servidor-de-teste.mjs",
+      url: "http://127.0.0.1:4174/api/saude",
+      reuseExistingServer: false,
+      timeout: 30_000,
+    },
+  ],
   forbidOnly: !!process.env.CI,
   retries: 0,
   reporter: process.env.CI ? [["list"], ["html", { open: "never" }]] : "list",

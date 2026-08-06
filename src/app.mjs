@@ -13,6 +13,18 @@
 import * as nucleo from "./nucleo/index.mjs";
 Object.assign(globalThis, nucleo);
 
+/* O acervo e opcional por desenho: todo metodo de API devolve null quando o
+   servidor nao responde, e a tela segue como antes de ele existir. Nao ha um
+   unico `await` deste modulo em caminho critico de geracao do .txt. */
+import * as API from "./api.mjs";
+globalThis.API = API;
+
+/* empresa que o CNPJ do documento encontrou no cadastro, se houver */
+let empresaDoCadastro = null;
+/* nome e hash do arquivo lido — o hash identifica a origem no acervo, ja que o
+   PDF em si nunca e guardado */
+let origemDoDocumento = null;
+
 /* ##################### leitura de contracheque ##################### */
 /* Extrai empregados e rubricas de um recibo de pagamento (PDF ou texto).
    O resultado nunca vai direto para a planilha: passa pelo menu de
@@ -128,11 +140,139 @@ function abrirMenuContracheque(dados, origem, tipo){
   /* guarda a folha lida para o cruzamento com o Portal do Empregado */
   ultimaListaPessoas = listaAtual().map(p=>({codigo:p.codigo, nome:p.nome}));
   $cp("cpPortalXlsx").hidden = rpa;
+  empresaDoCadastro = null;
+  /* so aparece se o acervo respondeu: sem servidor, o botao nem existe para o
+     usuario, em vez de existir e falhar */
+  $cp("cpAcervo").hidden = true;
   atualizarPrazosModal();
 
   $cp("modalContra").hidden = false;
   document.body.style.overflow = "hidden";
   setTimeout(()=>$cp("cpCodigo").focus(), 60);
+
+  /* O gancho do acervo: o CNPJ ja veio do PDF, entao a empresa se identifica
+     sozinha e traz codigo no Dominio, tipo de processo e plano de saude.
+     Roda depois de abrir o modal, sem await: se o servidor estiver fora, a
+     tela ja esta pronta para digitacao manual e nada disso chega ao usuario. */
+  preencherPeloCadastro(dados.cnpj);
+}
+
+/* Completa o que veio do cadastro, sem passar por cima do que o documento
+   trouxe nem do que o usuario ja digitou. */
+async function preencherPeloCadastro(cnpj){
+  if(!cnpj) return;
+  const empresa = await API.empresaPorCnpj(cnpj);
+  if(!empresa) return;
+  /* o usuario pode ter comecado a digitar enquanto a consulta ia e voltava */
+  const vazioAinda = id => !$cp(id).value.trim();
+
+  empresaDoCadastro = empresa;
+  if(vazioAinda("cpEmpresa")) $cp("cpEmpresa").value = empresa.razaoSocial;
+  if(vazioAinda("cpCodigo"))  $cp("cpCodigo").value  = empresa.codigoDominio;
+
+  if(contraTipo==="rpa"){
+    if(vazioAinda("cpDesc") && empresa.descricaoServicoPadrao)
+      $cp("cpDesc").value = empresa.descricaoServicoPadrao;
+  }else{
+    $cp("cpTipo").value = empresa.tipoProcessoPadrao || "11";
+    nomeDoTipo();
+    if(empresa.planoCnpj && empresa.planoRubricas.length){
+      $cp("cpPlanoSimples").checked = true;
+      $cp("cpPlanoCnpj").value = formatarCnpj(empresa.planoCnpj);
+      const doPlano = new Set(empresa.planoRubricas.map(String));
+      (contraDados.rubricas||[]).forEach(r=>{
+        r.planoSaude = doPlano.has(String(r.codigo));
+        if(r.planoSaude) r.marcada = true;
+      });
+      $cp("cpPlanoBox").hidden = false;
+      renderListaRubricas();
+      renderRubricasPlano();
+    }
+  }
+  atualizarContagens();
+  marcarOrigemCadastro(empresa);
+  /* com empresa cadastrada e arquivo identificado, da para gravar no acervo */
+  $cp("cpAcervo").hidden = !origemDoDocumento;
+}
+
+/* ##################### gravar no acervo #####################
+   Monta, a partir do que os parsers produziram, a forma que o servidor espera.
+   Grava o que foi LIDO do relatorio — nao o que o usuario marcou para a
+   planilha: o acervo e registro do documento, nao da escolha de geracao. */
+function paraOAcervo(){
+  const comum = {
+    cnpj: contraDados.cnpj || (empresaDoCadastro && empresaDoCadastro.cnpj),
+    empresaId: empresaDoCadastro ? empresaDoCadastro.id : undefined,
+    competencia: $cp("cpComp").value.trim(),
+    arquivoNome: origemDoDocumento.nome,
+    arquivoHash: origemDoDocumento.hash,
+    paginas: contraDados.paginas,
+  };
+
+  if(contraTipo==="rpa"){
+    const gente = contraDados.autonomos || [];
+    return {...comum, tipoDocumento:"rpa",
+      pessoas: gente.map(a=>({codigo:a.codigo, nome:a.nome, cpf:a.cpf, grupo:"contribuintes"})),
+      recibos: gente.filter(a=>a.valor!=null).map(a=>({
+        pessoaCodigo: a.codigo || a.nome, numero: a.numeroRecibo,
+        dataPagamento: seguro(()=>dataAAAAMMDD(a.data)) || null,
+        descricao: a.descricao, valor: a.valor,
+      })),
+    };
+  }
+
+  /* A Relacao Geral dos Liquidos traz liquido e nao traz rubrica; o
+     contracheque traz rubrica por empregado. Os dois viram a mesma forma. */
+  const pessoas = (contraDados.empregados||[]).map(e=>({
+    codigo: e.codigo, nome: e.nome, funcao: e.funcao,
+    grupo: "empregados", liquido: e.liquido,
+  }));
+  const lancamentos = [];
+  /* inclusive as descartadas: o Dominio calcula sozinho, mas elas ESTAO no
+     documento, e o acervo registra o documento */
+  const todas = (contraDados.rubricas||[]).concat(contraDados.rubricasDescartadas||[]);
+  for(const r of todas){
+    for(const [codigoPessoa, valor] of Object.entries(r.porEmpregado||{})){
+      lancamentos.push({pessoaCodigo: codigoPessoa, rubricaCodigo: r.codigo,
+                        rubricaDescricao: r.descricao, rubricaTipo: r.tipo, valor});
+    }
+  }
+  return {...comum,
+    tipoDocumento: contraDados.tipoOrigem === "liquidos" ? "liquidos" : "contracheque",
+    pessoas, lancamentos};
+}
+
+async function gravarNoAcervo(){
+  if(!contraDados || !origemDoDocumento) return;
+  const botao = $cp("cpAcervo");
+  const rotulo = botao.textContent;
+  botao.disabled = true;
+  botao.textContent = "gravando…";
+  try{
+    const r = await API.importarParaAcervo(paraOAcervo());
+    if(!r.ok){ $cp("cpErro").textContent = r.erro; return; }
+    $cp("cpErro").textContent = "";
+    botao.textContent = r.repetido ? "já estava no acervo ✓" : "gravado no acervo ✓";
+    if(r.avisos && r.avisos.length)
+      flash("warn", "Gravado com ressalvas", r.avisos.join(" · "));
+  }finally{
+    botao.disabled = false;
+    setTimeout(()=>{ botao.textContent = rotulo; }, 2400);
+  }
+}
+
+/* Deixa visivel o que nao foi digitado por ninguem — quem confere precisa saber
+   o que veio do cadastro para saber o que conferir. */
+function marcarOrigemCadastro(empresa){
+  const alvo = $cp("cpOrigem");
+  const jaTem = alvo.querySelector(".selo-cadastro");
+  if(jaTem) jaTem.remove();
+  const selo = document.createElement("span");
+  selo.className = "selo selo-var selo-cadastro";
+  selo.style.marginLeft = "8px";
+  selo.textContent = "preenchido pelo cadastro";
+  selo.title = `${empresa.razaoSocial} — codigo ${empresa.codigoDominio}`;
+  alvo.appendChild(selo);
 }
 
 function fecharMenuContracheque(){
@@ -539,13 +679,20 @@ async function lerContracheque(file){
   try{
     let paginas;
     if(/\.pdf$/i.test(file.name)){
-      const buf = new Uint8Array(await file.arrayBuffer());
+      const bytes = await file.arrayBuffer();
+      /* identifica o arquivo sem guardar o arquivo: e o hash que evita gravar
+         o mesmo relatorio duas vezes no acervo */
+      origemDoDocumento = { nome: file.name, hash: await API.hashDoArquivo(bytes) };
+      const buf = new Uint8Array(bytes);
       paginas = await linhasDoPdf(buf);
       const totalLinhas = paginas.reduce((s,p)=>s+p.length,0);
       if(!totalLinhas)
         throw new Error("esse PDF não tem texto — parece digitalizado. Exporte o documento de novo em PDF de texto, ou use o botão de colar.");
     }else{
-      paginas = [ linhasDoTexto(await file.text()) ];
+      const texto = await file.text();
+      origemDoDocumento = { nome: file.name,
+        hash: await API.hashDoArquivo(new TextEncoder().encode(texto)) };
+      paginas = [ linhasDoTexto(texto) ];
     }
     interpretarDocumento(paginas, file.name);
     document.getElementById("fileContra").textContent = file.name;
@@ -596,6 +743,8 @@ function interpretarRelacaoLiquidos(paginas, origem){
   const base = {
     empresa: rel.empresa, cnpj: rel.cnpj, competencia: rel.competencia,
     calculo: rel.calculo, totalEmpresa: rel.totalEmpresa, paginas: rel.paginas,
+    /* o acervo distingue os relatorios: este traz liquido e nao traz rubrica */
+    tipoOrigem: "liquidos",
   };
 
   if(modo==="rpa"){
@@ -604,17 +753,25 @@ function interpretarRelacaoLiquidos(paginas, origem){
     }), origem, "rpa");
   }else{
     abrirMenuContracheque(Object.assign({}, base, {
-      empregados: empreg.map(p=>({codigo:p.codigo, nome:p.nome, funcao:"", marcado:true})),
+      /* o liquido vem so deste relatorio — o contracheque nao o traz por pessoa */
+      empregados: empreg.map(p=>({codigo:p.codigo, nome:p.nome, funcao:"",
+                                  liquido:p.valor, marcado:true})),
       rubricas: [],
       avisos: avisos.concat(["Este relatório não traz rubricas — cadastre abaixo as que você vai lançar."]),
     }), origem, "lancamentos");
   }
 }
 
-function lerContrachequeTexto(){
+async function lerContrachequeTexto(){
   const txt = document.getElementById("cpColado").value;
   if(txt.trim().length<20){ erro("cole o texto do documento antes de ler"); return; }
-  try{ interpretarDocumento([ linhasDoTexto(txt) ], "texto colado"); }
+  try{
+    /* o texto colado tambem precisa de origem: sem ela o acervo nao teria como
+       reconhecer o mesmo conteudo lido duas vezes */
+    origemDoDocumento = { nome: "texto colado",
+      hash: await API.hashDoArquivo(new TextEncoder().encode(txt)) };
+    interpretarDocumento([ linhasDoTexto(txt) ], "texto colado");
+  }
   catch(e){ erro("não consegui interpretar o texto: "+e.message); }
 }
 
@@ -2430,6 +2587,7 @@ function copiarTexto(){
     mascararCompetencia(this); sugerirDataPagamento(false); atualizarPrazosModal();
   });
   document.getElementById("cpPortalXlsx").addEventListener("click",planilhaPortalEmpregado);
+  document.getElementById("cpAcervo").addEventListener("click",gravarNoAcervo);
 
   /* ---- Portal do Empregado ---- */
   const cardPe=document.getElementById("cardPortal"),

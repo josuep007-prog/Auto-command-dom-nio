@@ -9,3 +9,11 @@ playwright-report/
 
 # screenshots de conferencia, nao fazem parte do programa
 .shots/
+
+# banco descartavel dos testes
+*.db
+*.db-wal
+*.db-shm
+
+# configuracao local do servidor, com caminhos da maquina
+config.json
